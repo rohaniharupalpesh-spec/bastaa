@@ -1,0 +1,10 @@
+{
+  "name": "Bastaa Orders",
+  "short_name": "Bastaa",
+  "description": "Track custom orders for Bastaa and get reminders before they are due.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#faf6f1",
+  "theme_color": "#7a3e1d",
+  "icons": [{ "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

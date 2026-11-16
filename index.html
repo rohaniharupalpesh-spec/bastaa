@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#7a3e1d">
+<title>Bastaa Orders</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="icons/icon.svg" alt="" width="32" height="32"><span>Bastaa Orders</span></div>
+  <div class="top-actions">
+    <button id="bellBtn" class="icon-btn" title="Reminders" aria-label="Reminders">🔔<span id="bellCount" class="badge" hidden>0</span></button>
+    <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">⚙️</button>
+  </div>
+</header>
+
+<main>
+  <section id="reminderBanner" class="banner" hidden></section>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="toolbar">
+    <input id="search" type="search" placeholder="Search customer, phone, product, order no…">
+    <select id="statusFilter">
+      <option value="open">All open orders</option>
+      <option value="all">All orders</option>
+      <option value="Received">Received</option>
+      <option value="In Production">In Production</option>
+      <option value="Ready">Ready</option>
+      <option value="Delivered">Delivered</option>
+      <option value="Cancelled">Cancelled</option>
+    </select>
+    <select id="sortBy">
+      <option value="due">Sort: Due date</option>
+      <option value="created">Sort: Newest first</option>
+      <option value="customer">Sort: Customer</option>
+    </select>
+    <button id="newOrderBtn" class="primary">+ New order</button>
+  </section>
+
+  <section id="orderList" class="order-list"></section>
+</main>
+
+<!-- Order form -->
+<dialog id="orderDialog">
+  <form id="orderForm" method="dialog">
+    <div class="dlg-head">
+      <h2 id="formTitle">New order</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="dlg-body">
+      <fieldset>
+        <legend>Customer</legend>
+        <div class="grid2">
+          <label>Name *<input name="customer" required></label>
+          <label>Phone / WhatsApp<input name="phone" type="tel" inputmode="tel"></label>
+        </div>
+        <label>Address / delivery notes<textarea name="address" rows="2"></textarea></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Dates & status</legend>
+        <div class="grid3">
+          <label>Order date<input name="orderDate" type="date" required></label>
+          <label>Due date *<input name="dueDate" type="date" required></label>
+          <label>Status
+            <select name="status">
+              <option>Received</option><option>In Production</option><option>Ready</option><option>Delivered</option><option>Cancelled</option>
+            </select>
+          </label>
+        </div>
+        <div class="grid2">
+          <label>Remind me (days before due)<input name="remindDays" type="number" min="0" max="60" placeholder="Use default"></label>
+          <label>Priority
+            <select name="priority"><option>Normal</option><option>High</option><option>Urgent</option></select>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Products & customization</legend>
+        <div id="itemsWrap"></div>
+        <button type="button" id="addItemBtn" class="ghost">+ Add another product</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Payment</legend>
+        <div class="grid3">
+          <label>Total (₹)<input name="total" type="number" min="0" step="0.01" readonly class="readonly"></label>
+          <label>Advance paid (₹)<input name="advance" type="number" min="0" step="0.01"></label>
+          <label>Balance (₹)<input name="balance" readonly class="readonly"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Notes</legend>
+        <textarea name="notes" rows="2" placeholder="Anything else to remember…"></textarea>
+      </fieldset>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" id="deleteBtn" class="danger" hidden>Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="ghost" data-close>Cancel</button>
+      <button type="submit" class="primary">Save order</button>
+    </div>
+  </form>
+</dialog>
+
+<template id="itemTpl">
+  <div class="item-card">
+    <div class="item-head"><strong class="item-no">Product 1</strong><button type="button" class="icon-btn remove-item" aria-label="Remove product">🗑</button></div>
+    <div class="grid3">
+      <label>Product *<input class="i-product" list="productList" required placeholder="e.g. Tote bag"></label>
+      <label>Qty<input class="i-qty" type="number" min="1" value="1"></label>
+      <label>Price each (₹)<input class="i-price" type="number" min="0" step="0.01"></label>
+    </div>
+    <div class="grid3">
+      <label>Colour<input class="i-color"></label>
+      <label>Size / dimensions<input class="i-size"></label>
+      <label>Material / fabric<input class="i-material"></label>
+    </div>
+    <label>Personalization (name, text, monogram, embroidery)<input class="i-personal"></label>
+    <label>Customization details *<textarea class="i-details" rows="3" required placeholder="Describe exactly what the customer wants…"></textarea></label>
+    <div class="photos">
+      <label class="ghost file-btn">📷 Add reference photos<input class="i-photos" type="file" accept="image/*" multiple hidden></label>
+      <div class="thumbs"></div>
+    </div>
+  </div>
+</template>
+<datalist id="productList"></datalist>
+
+<!-- Order detail -->
+<dialog id="viewDialog">
+  <div class="dlg-head">
+    <h2 id="viewTitle">Order</h2>
+    <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+  </div>
+  <div class="dlg-body" id="viewBody"></div>
+  <div class="dlg-foot" id="viewFoot"></div>
+</dialog>
+
+<!-- Settings -->
+<dialog id="settingsDialog">
+  <form id="settingsForm" method="dialog">
+    <div class="dlg-head"><h2>Settings</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+    <div class="dlg-body">
+      <fieldset>
+        <legend>Reminders</legend>
+        <label>Default reminder: days before due date<input name="defaultRemindDays" type="number" min="0" max="60"></label>
+        <p class="hint">Orders show up in the reminder list from this many days before their due date, and stay there (marked overdue) until they are delivered or cancelled.</p>
+        <button type="button" id="enableNotifBtn" class="ghost">Enable phone / desktop notifications</button>
+        <p class="hint" id="notifState"></p>
+        <p class="hint">Notifications appear while the app is open or installed and running. For reminders that fire even when the app is closed, use <b>Add to calendar</b> on any order (or export all below) — your phone calendar will alert you.</p>
+        <button type="button" id="icsAllBtn" class="ghost">📅 Export all open orders to calendar (.ics)</button>
+      </fieldset>
+      <fieldset>
+        <legend>Business</legend>
+        <label>Business name (used in WhatsApp messages)<input name="businessName"></label>
+        <label>Order number prefix<input name="prefix" maxlength="8"></label>
+      </fieldset>
+      <fieldset>
+        <legend>Backup</legend>
+        <p class="hint">Orders are saved only on this device/browser. Download a backup regularly, and use it to move orders to another phone or computer.</p>
+        <div class="row-btns">
+          <button type="button" id="exportBtn" class="ghost">⬇ Download backup</button>
+          <label class="ghost file-btn">⬆ Restore backup<input id="importFile" type="file" accept="application/json,.json" hidden></label>
+          <button type="button" id="csvBtn" class="ghost">⬇ Export to Excel (CSV)</button>
+        </div>
+      </fieldset>
+    </div>
+    <div class="dlg-foot"><span class="spacer"></span><button type="submit" class="primary">Save settings</button></div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
