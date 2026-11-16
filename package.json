@@ -1,0 +1,26 @@
+{
+  "name": "stock-manager",
+  "version": "1.0.0",
+  "description": "Inventory / stock manager that syncs with your website via API, webhooks and an embeddable script",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rohaniharupalpesh-spec/bastaa.git"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rohaniharupalpesh-spec/bastaa/issues"
+  },
+  "homepage": "https://github.com/rohaniharupalpesh-spec/bastaa#readme",
+  "dependencies": {
+    "express": "^4.22.3"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

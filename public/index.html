@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stock Manager</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <!-- Login -->
+  <section id="login" class="login hidden">
+    <form id="login-form" class="card login-card">
+      <h1>Stock Manager</h1>
+      <p class="muted">Sign in to manage your inventory.</p>
+      <label>Password <input type="password" name="password" autocomplete="current-password" required autofocus></label>
+      <button class="btn primary" type="submit">Sign in</button>
+      <p id="login-error" class="error"></p>
+    </form>
+  </section>
+
+  <!-- App -->
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="brand">Stock Manager</div>
+      <nav class="tabs" role="tablist">
+        <button data-tab="products" class="tab active">Products</button>
+        <button data-tab="activity" class="tab">Activity</button>
+        <button data-tab="orders" class="tab">Orders</button>
+        <button data-tab="sync" class="tab">Website sync</button>
+      </nav>
+      <div class="topbar-right">
+        <span id="live" class="live" title="Live updates">● Live</span>
+        <button id="logout" class="btn ghost">Sign out</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Products -->
+      <section id="tab-products" class="panel">
+        <div class="stats" id="stats"></div>
+        <div class="toolbar">
+          <input id="search" type="search" placeholder="Search SKU, name or category…">
+          <label class="check"><input type="checkbox" id="low-only"> Low stock only</label>
+          <span class="spacer"></span>
+          <button class="btn" id="export">Export CSV</button>
+          <label class="btn" for="import-file">Import CSV</label>
+          <input type="file" id="import-file" accept=".csv,text/csv" hidden>
+          <button class="btn primary" id="add-product">+ Add product</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>SKU</th><th>Name</th><th>Category</th><th class="num">Price</th><th class="num">In stock</th><th>Status</th><th class="actions-col">Quick adjust</th><th></th></tr></thead>
+            <tbody id="product-rows"></tbody>
+          </table>
+          <p id="empty-products" class="empty hidden">No products yet. Add one or import a CSV.</p>
+        </div>
+      </section>
+
+      <!-- Activity -->
+      <section id="tab-activity" class="panel hidden">
+        <h2>Stock movements</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>When</th><th>SKU</th><th>Product</th><th class="num">Change</th><th class="num">After</th><th>Reason</th><th>Reference</th><th>Source</th><th>Note</th></tr></thead>
+            <tbody id="movement-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Orders -->
+      <section id="tab-orders" class="panel hidden">
+        <h2>Orders received from your website</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Order</th><th>Status</th><th>Items</th><th>Received</th><th></th></tr></thead>
+            <tbody id="order-rows"></tbody>
+          </table>
+          <p id="empty-orders" class="empty hidden">No orders yet. Your website sends them to <code>POST /api/v1/orders</code>.</p>
+        </div>
+      </section>
+
+      <!-- Sync -->
+      <section id="tab-sync" class="panel hidden">
+        <div class="grid2">
+          <div class="card">
+            <h2>API keys</h2>
+            <p class="muted"><b>Read keys</b> (<code>pk_…</code>) only show stock and are safe to put in your website's public pages.
+              <b>Write keys</b> (<code>sk_…</code>) change stock — keep them on your server only.</p>
+            <form id="key-form" class="inline-form">
+              <input name="label" placeholder="Label, e.g. My shop" required>
+              <select name="scope"><option value="read">Read (public)</option><option value="write">Write (secret)</option></select>
+              <button class="btn primary">Create key</button>
+            </form>
+            <div id="new-key" class="callout hidden"></div>
+            <ul id="key-list" class="list"></ul>
+          </div>
+          <div class="card">
+            <h2>Webhooks</h2>
+            <p class="muted">We'll POST to these URLs whenever stock or products change, so your website updates instantly.</p>
+            <form id="hook-form" class="inline-form">
+              <input name="url" type="url" placeholder="https://your-site.com/stock-webhook" required>
+              <button class="btn primary">Add webhook</button>
+            </form>
+            <ul id="hook-list" class="list"></ul>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Connect your website</h2>
+          <h3>1. Show live stock on any page (no coding)</h3>
+          <p class="muted">Paste this once before <code>&lt;/body&gt;</code>, then mark elements with a SKU:</p>
+          <pre id="embed-snippet"></pre>
+          <h3>2. Deduct stock when someone buys (from your server)</h3>
+          <pre id="order-snippet"></pre>
+          <h3>3. Cancel / refund an order (puts stock back)</h3>
+          <pre id="cancel-snippet"></pre>
+          <p class="muted">Full API reference is in the README.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Product dialog -->
+  <dialog id="product-dialog">
+    <form id="product-form" method="dialog" class="dialog-form">
+      <h2 id="product-dialog-title">Add product</h2>
+      <div class="grid2">
+        <label>SKU <input name="sku" required maxlength="64"></label>
+        <label>Name <input name="name" required maxlength="200"></label>
+        <label>Category <input name="category" maxlength="100" list="categories"></label>
+        <label>Price <input name="price" type="number" step="0.01" min="0" value="0"></label>
+        <label id="qty-field">Starting quantity <input name="quantity" type="number" step="1" min="0" value="0"></label>
+        <label>Low-stock alert at <input name="low_stock_threshold" type="number" step="1" min="0" value="5"></label>
+      </div>
+      <label>Description <textarea name="description" rows="3" maxlength="2000"></textarea></label>
+      <label class="check"><input type="checkbox" name="active" checked> Available on website</label>
+      <p class="error" id="product-error"></p>
+      <div class="dialog-actions">
+        <button type="button" class="btn danger hidden" id="delete-product">Delete</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>
+    <datalist id="categories"></datalist>
+  </dialog>
+
+  <!-- Adjust dialog -->
+  <dialog id="adjust-dialog">
+    <form id="adjust-form" method="dialog" class="dialog-form">
+      <h2>Adjust stock — <span id="adjust-name"></span></h2>
+      <p class="muted">Currently in stock: <b id="adjust-current"></b></p>
+      <div class="grid2">
+        <label>Mode
+          <select name="mode"><option value="delta">Add / remove</option><option value="set">Set exact count</option></select>
+        </label>
+        <label>Quantity <input name="amount" type="number" step="1" required></label>
+        <label>Reason <select name="reason"></select></label>
+        <label>Reference <input name="reference" placeholder="PO #, invoice…"></label>
+      </div>
+      <label>Note <input name="note"></label>
+      <p class="error" id="adjust-error"></p>
+      <div class="dialog-actions">
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary">Apply</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
