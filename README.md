@@ -19,3 +19,6 @@ Open `index.html` in a browser, or host the folder (e.g. GitHub Pages) and use *
 
 ## Your data
 Orders are stored **only on the device/browser you use** (IndexedDB). Use **Settings → Download backup** regularly. To move orders to another device, use **Restore backup** there.
+
+## Online version
+`artifact/bastaa-orders.html` is a single-page version published as a private Claude artifact. It saves orders online, so the same orders show on your phone and computer. It adds reminders through Google Calendar links, and it uses copy-to-clipboard job sheets instead of printing.

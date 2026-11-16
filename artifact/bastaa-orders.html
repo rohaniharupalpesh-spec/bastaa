@@ -1,0 +1,765 @@
+<title>Bastaa Orders</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: sticky brand bar, reminder strip, summary tiles, then a scannable list of order cards with a colour stripe for urgency. */
+:root {
+  --bg: #faf6f1; --surface: #ffffff; --surface2: #f3ece4; --text: #2a1d14; --muted: #76655a;
+  --line: #e4d8cb; --brand: #7a3e1d; --brand-ink: #ffffff;
+  --red: #b3261e; --red-soft: #fde8e6; --amber: #8f5a00; --amber-soft: #fff3d6;
+  --green: #2e7d32; --green-soft: #e5f4e6; --blue: #285f9e; --blue-soft: #e3eefa;
+  --scrim: rgba(20,10,5,.5); --shadow: 0 1px 3px rgba(60,30,10,.08), 0 4px 16px rgba(60,30,10,.06);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1a1411; --surface: #241c17; --surface2: #2e241e; --text: #f2e9e1; --muted: #b3a294;
+  --line: #3d3029; --brand: #d98b55; --brand-ink: #1a1411;
+  --red: #ff8a80; --red-soft: #3d1f1c; --amber: #ffcc66; --amber-soft: #3a2f17;
+  --green: #81c784; --green-soft: #1e3320; --blue: #90bdf0; --blue-soft: #1c2b3d;
+  --scrim: rgba(0,0,0,.6); --shadow: none; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #1a1411; --surface: #241c17; --surface2: #2e241e; --text: #f2e9e1; --muted: #b3a294;
+  --line: #3d3029; --brand: #d98b55; --brand-ink: #1a1411;
+  --red: #ff8a80; --red-soft: #3d1f1c; --amber: #ffcc66; --amber-soft: #3a2f17;
+  --green: #81c784; --green-soft: #1e3320; --blue: #90bdf0; --blue-soft: #1c2b3d;
+  --scrim: rgba(0,0,0,.6); --shadow: none; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font: 15px/1.45 var(--font); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--brand); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible, .order:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--brand); color: var(--brand-ink); }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+.brand svg { width: 30px; height: 30px; flex: none; }
+.sync { font-size: 12px; font-weight: 500; opacity: .85; }
+.top-actions { display: flex; gap: 4px; }
+.topbar .icon-btn { color: var(--brand-ink); }
+
+main { max-width: 1100px; margin: 0 auto; padding-block: 16px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+.icon-btn { position: relative; background: transparent; border: 0; font-size: 18px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.icon-btn:hover { background: rgba(127,127,127,.18); }
+.badge { position: absolute; top: -2px; right: -2px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: grid; place-items: center; padding: 0 4px; }
+
+.btn { border-radius: 10px; padding: 9px 14px; cursor: pointer; font-weight: 600; border: 1px solid var(--line); background: var(--surface); display: inline-block; text-decoration: none; color: inherit; font-size: 14px; }
+.btn:hover { background: var(--surface2); }
+.btn.primary { background: var(--brand); color: var(--brand-ink); border-color: transparent; }
+.btn.danger { background: var(--red-soft); color: var(--red); border-color: transparent; }
+.btn.small { padding: 5px 10px; font-size: 13px; }
+
+.notice { background: var(--blue-soft); color: var(--text); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px; }
+.banner { background: var(--amber-soft); border: 1px solid var(--line); border-left: 5px solid var(--amber); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+.banner h3 { margin: 0 0 6px; font-size: 15px; }
+.banner ul { margin: 0; padding-left: 18px; }
+.banner li { margin: 3px 0; cursor: pointer; }
+.banner li:hover { text-decoration: underline; }
+.banner .od { color: var(--red); font-weight: 600; }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stat { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; box-shadow: var(--shadow); cursor: pointer; }
+.stat.on { border-color: var(--brand); }
+.stat .n { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat .l { color: var(--muted); font-size: 13px; }
+.stat.red .n { color: var(--red); } .stat.amber .n { color: var(--amber); } .stat.green .n { color: var(--green); }
+
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.toolbar input[type=search] { flex: 1 1 240px; }
+.toolbar input, .toolbar select { padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); min-width: 0; }
+
+.order-list { display: grid; gap: 10px; }
+.order { background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--line); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); cursor: pointer; min-width: 0; }
+.order:hover { border-color: var(--brand); }
+.order.overdue { border-left-color: var(--red); } .order.soon { border-left-color: var(--amber); } .order.done { opacity: .72; }
+.order-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.order-top > div:first-child { min-width: 0; }
+.order h3 { margin: 0; font-size: 16px; overflow-wrap: anywhere; }
+.meta { color: var(--muted); font-size: 13px; }
+.order .items { margin: 6px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+.order .bottom { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.due { text-align: right; white-space: nowrap; font-size: 13px; }
+.due b { display: block; font-size: 14px; }
+.due.overdue b { color: var(--red); } .due.soon b { color: var(--amber); }
+
+.chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--surface2); }
+.chip.Received { background: var(--blue-soft); color: var(--blue); }
+.chip.In-Production { background: var(--amber-soft); color: var(--amber); }
+.chip.Ready { background: var(--green-soft); color: var(--green); }
+.chip.Delivered { color: var(--muted); }
+.chip.Cancelled, .chip.Urgent, .chip.bal { background: var(--red-soft); color: var(--red); }
+.chip.High { background: var(--amber-soft); color: var(--amber); }
+.chip.example { background: var(--surface2); color: var(--muted); }
+
+.empty { text-align: center; color: var(--muted); padding: 40px 10px; background: var(--surface); border: 1px dashed var(--line); border-radius: 12px; }
+
+dialog { border: 0; padding: 0; border-radius: 16px; width: min(760px, calc(100vw - 16px)); max-height: calc(100% - 32px); background: var(--surface); color: var(--text); box-shadow: 0 10px 40px rgba(0,0,0,.3); }
+dialog[open] { display: flex; flex-direction: column; }
+dialog form { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+dialog::backdrop { background: var(--scrim); }
+dialog.small { width: min(420px, calc(100vw - 16px)); }
+.dlg-head, .dlg-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
+.dlg-head { border-bottom: 1px solid var(--line); }
+.dlg-foot { border-top: 1px solid var(--line); flex-wrap: wrap; }
+.dlg-head h2 { margin: 0; font-size: 18px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.dlg-body { padding: 12px 16px; overflow-y: auto; flex: 1; min-height: 0; }
+.spacer { flex: 1; }
+
+fieldset { border: 1px solid var(--line); border-radius: 12px; margin: 0 0 12px; padding: 10px 12px 4px; min-width: 0; }
+legend { font-weight: 700; padding: 0 6px; color: var(--brand); }
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+label input, label select, label textarea, fieldset > textarea { display: block; width: 100%; margin-top: 3px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 15px; }
+fieldset > textarea { margin-bottom: 8px; }
+input[readonly] { background: var(--surface2); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 10px; }
+.hint { color: var(--muted); font-size: 13px; margin: 4px 0 10px; }
+.row-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+
+.item-card { background: var(--surface2); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+.item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.photos { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 4px; }
+.file-btn { font-size: 13px; color: var(--text); margin: 0; }
+.thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
+.thumb { position: relative; }
+.thumb img, .view-item .thumbs img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: block; cursor: zoom-in; background: var(--surface); }
+.view-item .thumbs img { width: 96px; height: 96px; }
+.thumb button { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: var(--red); color: #fff; font-size: 11px; cursor: pointer; padding: 0; }
+.uploading { font-size: 12px; color: var(--muted); }
+
+.view-section { margin-bottom: 14px; }
+.view-section h4 { margin: 0 0 6px; color: var(--brand); font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 14px; font-size: 14px; margin: 0; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.view-item { background: var(--surface2); border-radius: 10px; padding: 10px; margin-bottom: 8px; }
+.status-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.history { font-size: 13px; color: var(--muted); margin: 0; padding-left: 18px; }
+#lightbox { width: auto; max-width: calc(100vw - 16px); background: transparent; box-shadow: none; }
+#lightbox img { max-width: 100%; max-height: 85vh; border-radius: 10px; display: block; }
+
+.toast { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 10px; z-index: 100; max-width: calc(100vw - 32px); }
+
+@media (max-width: 640px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid2 { grid-template-columns: 1fr; }
+  .grid3 { grid-template-columns: 1fr 1fr; }
+  .grid3 > label:first-child { grid-column: 1 / -1; }
+  .toolbar select { flex: 1 1 40%; }
+  .toolbar .primary { flex: 1 1 100%; }
+  dialog { width: calc(100vw - 8px); max-height: calc(100% - 8px); }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="96" fill="#f6e7d6"/><path d="M150 210h212l-18 200H168z" fill="#7a3e1d"/><path d="M200 210v-30a56 56 0 0 1 112 0v30" fill="none" stroke="#7a3e1d" stroke-width="28" stroke-linecap="round"/></svg>
+    <div><div>Bastaa Orders</div><div class="sync" id="syncState">Connecting…</div></div>
+  </div>
+  <div class="top-actions">
+    <button id="bellBtn" class="icon-btn" title="Reminders" aria-label="Reminders">🔔<span id="bellCount" class="badge" hidden>0</span></button>
+    <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">⚙️</button>
+  </div>
+</header>
+
+<main>
+  <div id="notice" class="notice" hidden></div>
+  <section id="reminderBanner" class="banner" hidden></section>
+  <section class="stats" id="stats"></section>
+  <section class="toolbar">
+    <input id="search" type="search" placeholder="Search customer, phone, product, order no…" aria-label="Search orders">
+    <select id="statusFilter" aria-label="Filter by status">
+      <option value="open">All open orders</option><option value="all">All orders</option>
+      <option>Received</option><option>In Production</option><option>Ready</option><option>Delivered</option><option>Cancelled</option>
+    </select>
+    <select id="sortBy" aria-label="Sort">
+      <option value="due">Sort: Due date</option><option value="created">Sort: Newest first</option><option value="customer">Sort: Customer</option>
+    </select>
+    <button id="newOrderBtn" class="btn primary">+ New order</button>
+  </section>
+  <section id="orderList" class="order-list"><div class="empty">Loading orders…</div></section>
+</main>
+
+<dialog id="orderDialog">
+  <form id="orderForm">
+    <div class="dlg-head"><h2 id="formTitle">New order</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+    <div class="dlg-body">
+      <fieldset><legend>Customer</legend>
+        <div class="grid2">
+          <label>Name *<input id="f-customer" name="customer" required></label>
+          <label>Phone / WhatsApp<input id="f-phone" name="phone" type="tel" inputmode="tel"></label>
+        </div>
+        <label>Address / delivery notes<textarea id="f-address" name="address" rows="2"></textarea></label>
+      </fieldset>
+      <fieldset><legend>Dates &amp; status</legend>
+        <div class="grid3">
+          <label>Order date<input id="f-orderDate" name="orderDate" type="date" required></label>
+          <label>Due date *<input id="f-dueDate" name="dueDate" type="date" required></label>
+          <label>Status<select id="f-status" name="status"><option>Received</option><option>In Production</option><option>Ready</option><option>Delivered</option><option>Cancelled</option></select></label>
+        </div>
+        <div class="grid2">
+          <label>Remind me (days before due)<input id="f-remindDays" name="remindDays" type="number" min="0" max="60"></label>
+          <label>Priority<select id="f-priority" name="priority"><option>Normal</option><option>High</option><option>Urgent</option></select></label>
+        </div>
+      </fieldset>
+      <fieldset><legend>Products &amp; customization</legend>
+        <div id="itemsWrap"></div>
+        <button type="button" id="addItemBtn" class="btn">+ Add another product</button>
+        <p class="hint"></p>
+      </fieldset>
+      <fieldset><legend>Payment</legend>
+        <div class="grid3">
+          <label>Total (₹)<input id="f-total" name="total" readonly></label>
+          <label>Advance paid (₹)<input id="f-advance" name="advance" type="number" min="0" step="0.01"></label>
+          <label>Balance (₹)<input id="f-balance" name="balance" readonly></label>
+        </div>
+      </fieldset>
+      <fieldset><legend>Notes</legend><textarea id="f-notes" name="notes" rows="2" placeholder="Anything else to remember…"></textarea></fieldset>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" id="deleteBtn" class="btn danger" hidden>Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="submit" class="btn primary" id="saveBtn">Save order</button>
+    </div>
+  </form>
+</dialog>
+
+<template id="itemTpl">
+  <div class="item-card">
+    <div class="item-head"><strong class="item-no">Product 1</strong><button type="button" class="icon-btn remove-item" aria-label="Remove product">🗑</button></div>
+    <div class="grid3">
+      <label>Product *<input class="i-product" list="productList" required placeholder="e.g. Tote bag"></label>
+      <label>Qty<input class="i-qty" type="number" min="1" value="1"></label>
+      <label>Price each (₹)<input class="i-price" type="number" min="0" step="0.01"></label>
+    </div>
+    <div class="grid3">
+      <label>Colour<input class="i-color"></label>
+      <label>Size / dimensions<input class="i-size"></label>
+      <label>Material / fabric<input class="i-material"></label>
+    </div>
+    <label>Personalization (name, text, monogram, embroidery)<input class="i-personal"></label>
+    <label>Customization details *<textarea class="i-details" rows="3" required placeholder="Describe exactly what the customer wants…"></textarea></label>
+    <div class="photos">
+      <label class="btn small file-btn">📷 Add reference photos<input class="i-photos" type="file" accept="image/*" multiple hidden></label>
+      <span class="uploading" hidden>Uploading…</span>
+      <div class="thumbs"></div>
+    </div>
+  </div>
+</template>
+<datalist id="productList"></datalist>
+
+<dialog id="viewDialog">
+  <div class="dlg-head"><h2 id="viewTitle">Order</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+  <div class="dlg-body" id="viewBody"></div>
+  <div class="dlg-foot" id="viewFoot"></div>
+</dialog>
+
+<dialog id="settingsDialog">
+  <form id="settingsForm">
+    <div class="dlg-head"><h2>Settings</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></div>
+    <div class="dlg-body">
+      <fieldset><legend>Reminders</legend>
+        <label>Default reminder: days before due date<input id="s-defaultRemindDays" name="defaultRemindDays" type="number" min="0" max="60"></label>
+        <p class="hint">An order appears in the reminder list from this many days before it is due, and stays there (marked overdue) until it is delivered or cancelled. You can change it on any single order too.</p>
+        <p class="hint">To get a phone alert even when this page is closed, open an order and tap <b>Google Calendar reminder</b>. It adds an event on the reminder day, and your calendar alerts you.</p>
+      </fieldset>
+      <fieldset><legend>Business</legend>
+        <label>Business name (used in WhatsApp messages)<input id="s-businessName" name="businessName"></label>
+        <label>Order number prefix<input id="s-prefix" name="prefix" maxlength="8"></label>
+      </fieldset>
+      <fieldset><legend>Backup &amp; export</legend>
+        <p class="hint" id="storageHint"></p>
+        <div class="row-btns">
+          <button type="button" id="exportBtn" class="btn small">⬇ Download backup</button>
+          <label class="btn small file-btn">⬆ Restore backup<input id="importFile" type="file" accept="application/json,.json" hidden></label>
+          <button type="button" id="csvBtn" class="btn small">⬇ Export to Excel (CSV)</button>
+        </div>
+      </fieldset>
+    </div>
+    <div class="dlg-foot"><span class="spacer"></span><button type="submit" class="btn primary">Save settings</button></div>
+  </form>
+</dialog>
+
+<dialog id="askDialog" class="small">
+  <div class="dlg-body" id="askText" style="padding-top:16px"></div>
+  <div class="dlg-foot" id="askBtns"></div>
+</dialog>
+
+<dialog id="lightbox"><img alt="Reference photo" id="lightboxImg"></dialog>
+
+<div id="toast" class="toast" hidden role="status"></div>
+
+<script>
+'use strict';
+const STATUSES = ['Received', 'In Production', 'Ready', 'Delivered', 'Cancelled'];
+const CLOSED = new Set(['Delivered', 'Cancelled']);
+const DEFAULT_SETTINGS = { defaultRemindDays: 3, businessName: 'Bastaa', prefix: 'BST' };
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+
+/* ---------- storage: online (db) when available, this device otherwise ---------- */
+function lsGet(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
+
+let store = null, assets = null, downloads = null;
+let orders = [], settings = { ...DEFAULT_SETTINGS };
+
+const localStore = {
+  mode: 'local',
+  start(onOrders, onSettings) {
+    onOrders(lsGet('bastaa.orders', [])); onSettings(lsGet('bastaa.settings', {}));
+  },
+  async put(o) {
+    const list = lsGet('bastaa.orders', []).filter(x => x.id !== o.id); list.push(o);
+    if (!lsSet('bastaa.orders', list)) throw new Error('This device is out of space for photos. Remove some photos and try again.');
+    orders = list; render();
+  },
+  async del(id) { orders = lsGet('bastaa.orders', []).filter(x => x.id !== id); lsSet('bastaa.orders', orders); render(); },
+  async saveSettings(s) { lsSet('bastaa.settings', s); },
+};
+
+function cloudStore(db) {
+  const col = db.collection('orders');
+  const sdoc = db.doc('config/settings');
+  return {
+    mode: 'cloud',
+    start(onOrders, onSettings) {
+      const timer = setTimeout(() => setSync('Still connecting… changes may not show yet'), 10000);
+      col.onSnapshot(snap => {
+        if (!snap.metadata.fromCache) { clearTimeout(timer); setSync('Saved online · syncs across your devices'); }
+        onOrders(snap.docs.map(d => ({ ...d.data(), id: d.id })));
+      }, e => { clearTimeout(timer); setSync('Could not load orders (' + e.code + ')'); });
+      sdoc.onSnapshot(s => onSettings(s.exists ? s.data() : {}), () => {});
+    },
+    put: o => col.doc(o.id).set(JSON.parse(JSON.stringify(o))),
+    del: id => col.doc(id).delete(),
+    saveSettings: s => sdoc.set(s),
+  };
+}
+
+function setSync(t) { $('#syncState').textContent = t; }
+
+async function init() {
+  const c = window.claude;
+  let db = null;
+  if (c && c.use) {
+    [db, assets, downloads] = await Promise.all([c.use('db'), c.use('assets'), c.use('downloads')].map(p => p.catch(() => null)));
+  }
+  if (db) { store = cloudStore(db); }
+  else {
+    store = localStore;
+    setSync('Saved on this device only');
+    const n = $('#notice'); n.hidden = false;
+    n.textContent = 'Online saving is not available in this view, so orders are kept in this browser only. Open the page signed in to Claude to save them online.';
+  }
+  store.start(list => { orders = list; render(); }, s => { settings = { ...DEFAULT_SETTINGS, ...s }; render(); });
+}
+
+/* ---------- dates & money ---------- */
+const pad = n => String(n).padStart(2, '0');
+const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayISO = () => isoOf(new Date());
+const parseISO = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (iso, n) => { const d = parseISO(iso); d.setDate(d.getDate() + n); return isoOf(d); };
+const daysUntil = iso => Math.round((parseISO(iso) - parseISO(todayISO())) / 86400000);
+const fmtDate = iso => iso ? parseISO(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const money = n => '₹' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function dueText(d) {
+  if (d < 0) return `${-d} day${d === -1 ? '' : 's'} overdue`;
+  if (d === 0) return 'Due today';
+  if (d === 1) return 'Due tomorrow';
+  return `Due in ${d} days`;
+}
+const remindDaysFor = o => (o.remindDays === '' || o.remindDays == null) ? Number(settings.defaultRemindDays) : Number(o.remindDays);
+const orderTotal = o => (o.items || []).reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.price) || 0), 0);
+const orderBalance = o => orderTotal(o) - (Number(o.advance) || 0);
+function urgency(o) {
+  if (CLOSED.has(o.status)) return 'done';
+  const d = daysUntil(o.dueDate);
+  return d < 0 ? 'overdue' : d <= remindDaysFor(o) ? 'soon' : 'ok';
+}
+const photoSrc = p => typeof p === 'string' ? p : p && p.asset ? '/_blob/' + p.asset : '';
+
+/* ---------- rendering ---------- */
+let quickFilter = null;
+function render() {
+  renderStats(); renderList(); renderBanner();
+  const products = [...new Set(orders.flatMap(o => (o.items || []).map(i => i.product)).filter(Boolean))].sort();
+  $('#productList').innerHTML = products.map(p => `<option value="${esc(p)}">`).join('');
+  if ($('#viewDialog').open && viewingId) openView(viewingId, true);
+}
+
+function renderStats() {
+  const open = orders.filter(o => !CLOSED.has(o.status));
+  const overdue = open.filter(o => urgency(o) === 'overdue').length;
+  const soon = open.filter(o => urgency(o) === 'soon').length;
+  const ready = open.filter(o => o.status === 'Ready').length;
+  const pending = open.reduce((s, o) => s + Math.max(0, orderBalance(o)), 0);
+  const on = f => quickFilter === f ? ' on' : '';
+  $('#stats').innerHTML = `
+    <button class="stat" data-f="open"><div class="n">${open.length}</div><div class="l">Open orders</div></button>
+    <button class="stat red${on('overdue')}" data-f="overdue"><div class="n">${overdue}</div><div class="l">Overdue</div></button>
+    <button class="stat amber${on('soon')}" data-f="soon"><div class="n">${soon}</div><div class="l">Due soon</div></button>
+    <button class="stat green" data-f="Ready"><div class="n">${ready}</div><div class="l">Ready · ${money(pending)} to collect</div></button>`;
+}
+
+function filtered() {
+  const q = $('#search').value.trim().toLowerCase();
+  const sf = $('#statusFilter').value;
+  const list = orders.filter(o => {
+    if (quickFilter) { if (urgency(o) !== quickFilter) return false; }
+    else if (sf === 'open') { if (CLOSED.has(o.status)) return false; }
+    else if (sf !== 'all' && o.status !== sf) return false;
+    if (!q) return true;
+    return [o.orderNo, o.customer, o.phone, o.notes, ...(o.items || []).flatMap(i => [i.product, i.details, i.personal, i.color, i.material])].join(' ').toLowerCase().includes(q);
+  });
+  const sort = $('#sortBy').value;
+  return list.sort((a, b) => sort === 'created' ? String(b.createdAt).localeCompare(a.createdAt)
+    : sort === 'customer' ? String(a.customer).localeCompare(b.customer) : String(a.dueDate).localeCompare(b.dueDate));
+}
+
+function renderList() {
+  const list = filtered(), el = $('#orderList');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty">${orders.length ? 'No orders match this view.' : 'No orders yet.<br>Tap <b>+ New order</b> to add your first custom order.'}</div>`;
+    return;
+  }
+  el.innerHTML = list.map(o => {
+    const u = urgency(o), d = daysUntil(o.dueDate), bal = orderBalance(o);
+    const items = (o.items || []).map(i => `${esc(i.product)}${Number(i.qty) > 1 ? ' ×' + i.qty : ''}${i.personal ? ` <span class="meta">“${esc(i.personal)}”</span>` : ''}`).join(', ');
+    return `<article class="order ${u}" data-id="${esc(o.id)}" tabindex="0">
+      <div class="order-top">
+        <div><h3>${esc(o.customer)}</h3><div class="meta">${esc(o.orderNo)}${o.phone ? ' · ' + esc(o.phone) : ''}</div></div>
+        <div class="due ${u}"><b>${CLOSED.has(o.status) ? esc(o.status) : dueText(d)}</b>${fmtDate(o.dueDate)}</div>
+      </div>
+      <div class="items">${items}</div>
+      <div class="bottom">
+        <span class="chip ${o.status.replace(' ', '-')}">${esc(o.status)}</span>
+        ${o.priority && o.priority !== 'Normal' ? `<span class="chip ${esc(o.priority)}">${esc(o.priority)}</span>` : ''}
+        ${bal > 0 && o.status !== 'Cancelled' ? `<span class="chip bal">Balance ${money(bal)}</span>` : ''}
+        ${o.example ? '<span class="chip example">Example order</span>' : ''}
+      </div>
+    </article>`;
+  }).join('');
+}
+
+const reminderList = () => orders.filter(o => ['overdue', 'soon'].includes(urgency(o))).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+function renderBanner() {
+  const list = reminderList(), b = $('#reminderBanner');
+  $('#bellCount').hidden = !list.length; $('#bellCount').textContent = list.length;
+  if (!list.length || lsGet('bastaa.bannerHidden', '') === todayISO() + ':' + list.length) { b.hidden = true; return; }
+  b.hidden = false;
+  b.innerHTML = `<h3>⏰ ${list.length} order${list.length > 1 ? 's' : ''} need${list.length > 1 ? '' : 's'} attention</h3><ul>${list.map(o => {
+    const d = daysUntil(o.dueDate);
+    return `<li data-id="${esc(o.id)}"><span class="${d < 0 ? 'od' : ''}">${dueText(d)}</span> — ${esc(o.customer)}: ${esc((o.items || []).map(i => i.product).join(', '))} <span class="meta">(${esc(o.status)})</span></li>`;
+  }).join('')}</ul><div style="margin-top:8px"><button class="btn small" id="hideBanner">Hide for today</button></div>`;
+}
+
+/* ---------- small helpers: ask, toast, copy, download ---------- */
+function ask(text, buttons) {
+  return new Promise(res => {
+    const d = $('#askDialog');
+    $('#askText').textContent = text;
+    $('#askBtns').innerHTML = '<span class="spacer"></span>' + buttons.map((b, i) => `<button class="btn ${b.cls || ''}" data-i="${i}">${esc(b.label)}</button>`).join('');
+    $$('#askBtns button').forEach(btn => btn.onclick = () => { d.close(); res(buttons[+btn.dataset.i].value); });
+    d.onclose = () => res(null);
+    d.showModal();
+  });
+}
+let toastT;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3000); }
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast('Copied. Paste it into WhatsApp or notes.'); }
+  catch { await ask('Copy this text:\n\n' + text, [{ label: 'Done', value: 1, cls: 'primary' }]); }
+}
+async function offerFile(filename, data) {
+  if (!downloads) return toast('Downloads are not available in this view.');
+  try { await downloads.save({ filename, data }); }
+  catch (e) { if (e && e.code !== 'declined') toast('Could not download: ' + (e.message || e.code)); }
+}
+
+/* ---------- reminders: Google Calendar & WhatsApp ---------- */
+function gcalLink(o) {
+  const n = remindDaysFor(o);
+  const day = n > 0 ? addDays(o.dueDate, -n) : o.dueDate;
+  const items = (o.items || []).map(i => i.product).join(', ');
+  const p = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `Bastaa: ${o.customer}'s order due ${fmtDate(o.dueDate)} (${items})`,
+    dates: `${day.replace(/-/g, '')}/${addDays(day, 1).replace(/-/g, '')}`,
+    details: jobSheet(o),
+  });
+  return 'https://calendar.google.com/calendar/render?' + p.toString();
+}
+function waLink(o) {
+  let p = String(o.phone || '').replace(/\D/g, '');
+  if (p.length === 10) p = '91' + p;
+  if (p.length === 11 && p.startsWith('0')) p = '91' + p.slice(1);
+  if (!p) return null;
+  const items = (o.items || []).map(i => `${i.product}${Number(i.qty) > 1 ? ' x' + i.qty : ''}`).join(', ');
+  const bal = orderBalance(o), balLine = bal > 0 ? ` Balance payable: ${money(bal)}.` : '';
+  const n = settings.businessName || 'Bastaa';
+  const msg = {
+    'Ready': `Hi ${o.customer}, your ${n} order ${o.orderNo} (${items}) is ready!${balLine} Thank you 😊`,
+    'Delivered': `Hi ${o.customer}, thank you for ordering from ${n}! We hope you love your ${items}. 💛`,
+    'In Production': `Hi ${o.customer}, your ${n} order ${o.orderNo} (${items}) is being made and is expected by ${fmtDate(o.dueDate)}.`,
+  }[o.status] || `Hi ${o.customer}, we have received your ${n} order ${o.orderNo} (${items}). Expected by ${fmtDate(o.dueDate)}.${balLine}`;
+  return `https://wa.me/${p}?text=${encodeURIComponent(msg)}`;
+}
+function jobSheet(o) {
+  const lines = [`${settings.businessName} order ${o.orderNo}`, `Customer: ${o.customer}${o.phone ? ' (' + o.phone + ')' : ''}`,
+    `Due: ${fmtDate(o.dueDate)} · Priority: ${o.priority || 'Normal'}`, ''];
+  (o.items || []).forEach((i, n) => {
+    lines.push(`${n + 1}. ${i.product} × ${i.qty}`);
+    for (const [k, v] of [['Colour', i.color], ['Size', i.size], ['Material', i.material], ['Personalization', i.personal], ['Details', i.details]])
+      if (v) lines.push(`   ${k}: ${v}`);
+  });
+  if (o.notes) lines.push('', 'Notes: ' + o.notes);
+  return lines.join('\n');
+}
+
+/* ---------- photos ---------- */
+function resizeImage(file, max = 1000) {
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => b ? res({ blob: b, dataUrl: () => c.toDataURL('image/jpeg', 0.7) }) : rej(new Error('Could not read that photo.')), 'image/jpeg', 0.8);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not read that photo.')); };
+    img.src = url;
+  });
+}
+async function storePhoto(file) {
+  const r = await resizeImage(file);
+  if (assets) {
+    try { const up = await assets.upload(r.blob, { type: 'image/jpeg' }); return { asset: up.id }; }
+    catch (e) { if (store.mode === 'cloud') throw new Error('Photo upload failed: ' + (e.message || e.code)); }
+  }
+  if (store.mode === 'cloud') throw new Error('Photos can only be added by the page owner or editors.');
+  return r.dataUrl(store.mode === 'local' ? 600 : 1000);
+}
+function openImage(src) { $('#lightboxImg').src = src; $('#lightbox').showModal(); }
+$('#lightbox').onclick = () => $('#lightbox').close();
+
+/* ---------- order form ---------- */
+let editing = null, formPhotos = [], pendingUploads = 0;
+function addItemRow(item = {}) {
+  const node = $('#itemTpl').content.firstElementChild.cloneNode(true);
+  const idx = formPhotos.length;
+  formPhotos.push([...(item.photos || [])]);
+  node.dataset.idx = idx;
+  for (const k of ['product', 'price', 'color', 'size', 'material', 'personal', 'details']) $('.i-' + k, node).value = item[k] ?? '';
+  $('.i-qty', node).value = item.qty || 1;
+  $('.remove-item', node).onclick = () => {
+    if ($$('#itemsWrap .item-card').length === 1) return toast('An order needs at least one product.');
+    node.remove(); renumberItems(); updateTotals();
+  };
+  $('.i-photos', node).onchange = async e => {
+    const files = [...e.target.files]; e.target.value = '';
+    pendingUploads += files.length; $('.uploading', node).hidden = false;
+    for (const f of files) {
+      try { formPhotos[idx].push(await storePhoto(f)); drawThumbs(node); } catch (err) { toast(err.message); }
+      pendingUploads--;
+    }
+    $('.uploading', node).hidden = true;
+  };
+  node.addEventListener('input', updateTotals);
+  $('#itemsWrap').appendChild(node);
+  drawThumbs(node); renumberItems();
+}
+function drawThumbs(node) {
+  const idx = +node.dataset.idx;
+  $('.thumbs', node).innerHTML = formPhotos[idx].map((p, i) => `<div class="thumb"><img src="${esc(photoSrc(p))}" alt="Reference photo ${i + 1}"><button type="button" data-i="${i}" aria-label="Remove photo">✕</button></div>`).join('');
+  $$('.thumb button', node).forEach(b => b.onclick = () => { formPhotos[idx].splice(+b.dataset.i, 1); drawThumbs(node); });
+  $$('.thumb img', node).forEach(img => img.onclick = () => openImage(img.src));
+}
+function renumberItems() { $$('#itemsWrap .item-card').forEach((c, i) => $('.item-no', c).textContent = `Product ${i + 1}`); }
+function readItems() {
+  return $$('#itemsWrap .item-card').map(c => ({
+    product: $('.i-product', c).value.trim(), qty: Number($('.i-qty', c).value) || 1,
+    price: $('.i-price', c).value === '' ? '' : Number($('.i-price', c).value),
+    color: $('.i-color', c).value.trim(), size: $('.i-size', c).value.trim(), material: $('.i-material', c).value.trim(),
+    personal: $('.i-personal', c).value.trim(), details: $('.i-details', c).value.trim(), photos: formPhotos[+c.dataset.idx],
+  }));
+}
+function updateTotals() {
+  const total = readItems().reduce((s, i) => s + i.qty * (Number(i.price) || 0), 0);
+  $('#f-total').value = money(total);
+  $('#f-balance').value = money(total - (Number($('#f-advance').value) || 0));
+}
+function nextOrderNo() {
+  const nums = orders.map(o => parseInt(String(o.orderNo).replace(/\D/g, ''), 10)).filter(n => !isNaN(n));
+  return `${settings.prefix || 'BST'}-${(nums.length ? Math.max(...nums) : 1000) + 1}`;
+}
+function openForm(o = null) {
+  editing = o; formPhotos = [];
+  const f = $('#orderForm'); f.reset(); $('#itemsWrap').innerHTML = '';
+  $('#formTitle').textContent = o ? `Edit ${o.orderNo}` : 'New order';
+  $('#deleteBtn').hidden = !o;
+  const v = o || { orderDate: todayISO(), status: 'Received', priority: 'Normal', items: [{}] };
+  for (const k of ['customer', 'phone', 'address', 'orderDate', 'dueDate', 'status', 'remindDays', 'priority', 'advance', 'notes']) $('#f-' + k).value = v[k] ?? '';
+  $('#f-remindDays').placeholder = `Default (${settings.defaultRemindDays})`;
+  (v.items && v.items.length ? v.items : [{}]).forEach(addItemRow);
+  updateTotals();
+  $('#orderDialog').showModal();
+}
+$('#orderForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (pendingUploads > 0) return toast('Wait for the photos to finish uploading.');
+  const g = k => $('#f-' + k).value;
+  if (g('dueDate') < g('orderDate')) return toast('The due date is before the order date. Check both dates.');
+  const now = new Date().toISOString();
+  const data = {
+    customer: g('customer').trim(), phone: g('phone').trim(), address: g('address').trim(),
+    orderDate: g('orderDate'), dueDate: g('dueDate'), status: g('status'),
+    remindDays: g('remindDays') === '' ? '' : Number(g('remindDays')), priority: g('priority'),
+    advance: Number(g('advance')) || 0, notes: g('notes').trim(), items: readItems(), updatedAt: now,
+  };
+  let o;
+  if (editing) {
+    o = { ...editing, ...data, history: [...(editing.history || [])] };
+    delete o.example;
+    if (editing.status !== o.status) o.history.push({ at: now, text: `Status → ${o.status}` });
+    if (editing.dueDate !== o.dueDate) o.history.push({ at: now, text: `Due date changed to ${fmtDate(o.dueDate)}` });
+  } else {
+    o = { id: 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), orderNo: nextOrderNo(), createdAt: now, history: [{ at: now, text: 'Order created' }], ...data };
+  }
+  $('#saveBtn').disabled = true;
+  try { await store.put(o); $('#orderDialog').close(); toast(editing ? 'Order updated' : `Order ${o.orderNo} saved`); }
+  catch (err) { toast('Could not save: ' + (err.message || err.code)); }
+  finally { $('#saveBtn').disabled = false; }
+});
+$('#deleteBtn').onclick = async () => {
+  const o = editing; if (!o) return;
+  const ok = await ask(`Delete order ${o.orderNo} for ${o.customer}? This cannot be undone.`, [{ label: 'Keep it', value: false }, { label: 'Delete order', value: true, cls: 'danger' }]);
+  if (!ok) return;
+  try {
+    await store.del(o.id);
+    if (assets) for (const p of (o.items || []).flatMap(i => i.photos || [])) if (p && p.asset) assets.delete(p.asset).catch(() => {});
+    $('#orderDialog').close(); toast('Order deleted');
+  } catch (err) { toast('Could not delete: ' + (err.message || err.code)); }
+};
+$('#addItemBtn').onclick = () => addItemRow();
+$('#f-advance').addEventListener('input', updateTotals);
+
+/* ---------- order detail ---------- */
+let viewingId = null;
+function openView(id, refresh = false) {
+  const o = orders.find(x => x.id === id);
+  if (!o) { if (refresh) $('#viewDialog').close(); return; }
+  viewingId = id;
+  const u = urgency(o), d = daysUntil(o.dueDate);
+  const row = (k, v) => v || v === 0 ? `<dt>${k}</dt><dd>${esc(v)}</dd>` : '';
+  $('#viewTitle').textContent = `${o.orderNo} · ${o.customer}`;
+  $('#viewBody').innerHTML = `
+    <div class="view-section"><div class="status-row">${STATUSES.map(s => `<button class="btn small ${s === o.status ? 'primary' : ''}" data-status="${s}">${s}</button>`).join('')}</div></div>
+    <div class="view-section"><h4>Due</h4><div class="due ${u}" style="text-align:left;white-space:normal"><b>${CLOSED.has(o.status) ? esc(o.status) : dueText(d)}</b>${fmtDate(o.dueDate)} · ordered ${fmtDate(o.orderDate)} · reminder ${remindDaysFor(o)} day(s) before</div></div>
+    <div class="view-section"><h4>Customer</h4><dl class="kv">${row('Name', o.customer)}${row('Phone', o.phone)}${row('Address', o.address)}</dl></div>
+    <div class="view-section"><h4>Products</h4>${(o.items || []).map((i, n) => `
+      <div class="view-item"><strong>${n + 1}. ${esc(i.product)}</strong> × ${esc(i.qty)}${i.price !== '' && i.price != null ? ` @ ${money(i.price)}` : ''}
+        <dl class="kv" style="margin-top:6px">${row('Colour', i.color)}${row('Size', i.size)}${row('Material', i.material)}${row('Personalization', i.personal)}${row('Details', i.details)}</dl>
+        ${i.photos && i.photos.length ? `<div class="thumbs" style="margin-top:8px">${i.photos.map(p => `<img src="${esc(photoSrc(p))}" alt="Reference photo">`).join('')}</div>` : ''}
+      </div>`).join('')}</div>
+    <div class="view-section"><h4>Payment</h4><dl class="kv">${row('Total', money(orderTotal(o)))}${row('Advance', money(o.advance))}<dt>Balance</dt><dd><b>${money(orderBalance(o))}</b></dd></dl></div>
+    ${o.notes ? `<div class="view-section"><h4>Notes</h4><div style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(o.notes)}</div></div>` : ''}
+    <div class="view-section"><h4>History</h4><ul class="history">${(o.history || []).map(h => `<li>${new Date(h.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} — ${esc(h.text)}</li>`).join('')}</ul></div>`;
+  const wa = waLink(o);
+  $('#viewFoot').innerHTML = `
+    ${wa ? `<a class="btn small" href="${esc(wa)}" target="_blank" rel="noopener">💬 WhatsApp update</a>` : ''}
+    ${CLOSED.has(o.status) ? '' : `<a class="btn small" href="${esc(gcalLink(o))}" target="_blank" rel="noopener">📅 Google Calendar reminder</a>`}
+    <button class="btn small" id="copySheet">📋 Copy job sheet</button>
+    <span class="spacer"></span>
+    <button class="btn small primary" id="editOne">Edit</button>`;
+  $$('#viewBody [data-status]').forEach(b => b.onclick = async () => {
+    const s = b.dataset.status; if (s === o.status) return;
+    const now = new Date().toISOString();
+    const upd = { ...o, status: s, updatedAt: now, history: [...(o.history || []), { at: now, text: `Status → ${s}` }] };
+    delete upd.example;
+    try { await store.put(upd); toast(`Marked ${s}`); } catch (err) { toast('Could not update: ' + (err.message || err.code)); }
+  });
+  $$('#viewBody .thumbs img').forEach(img => img.onclick = () => openImage(img.src));
+  $('#copySheet').onclick = () => copyText(jobSheet(o));
+  $('#editOne').onclick = () => { $('#viewDialog').close(); openForm(o); };
+  if (!$('#viewDialog').open) $('#viewDialog').showModal();
+}
+$('#viewDialog').addEventListener('close', () => viewingId = null);
+
+/* ---------- settings, backup, export ---------- */
+$('#settingsBtn').onclick = () => {
+  for (const k of Object.keys(DEFAULT_SETTINGS)) $('#s-' + k).value = settings[k];
+  $('#storageHint').textContent = store && store.mode === 'cloud'
+    ? 'Orders are saved online and show on any device where you open this page. A backup file is still a good idea once in a while.'
+    : 'Orders are saved in this browser only. Download a backup regularly so you do not lose them.';
+  $('#exportBtn').hidden = $('#csvBtn').hidden = !downloads;
+  $('#settingsDialog').showModal();
+};
+$('#settingsForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const s = {
+    defaultRemindDays: Math.max(0, Number($('#s-defaultRemindDays').value) || 0),
+    businessName: $('#s-businessName').value.trim() || 'Bastaa', prefix: $('#s-prefix').value.trim() || 'BST',
+  };
+  try { await store.saveSettings(s); settings = s; render(); $('#settingsDialog').close(); toast('Settings saved'); }
+  catch (err) { toast('Could not save settings: ' + (err.message || err.code)); }
+});
+$('#exportBtn').onclick = () => offerFile(`bastaa-backup-${todayISO()}.json`,
+  JSON.stringify({ app: 'bastaa-orders', version: 1, exportedAt: new Date().toISOString(), settings, orders }, null, 1));
+$('#csvBtn').onclick = () => {
+  const cols = ['Order No', 'Customer', 'Phone', 'Order Date', 'Due Date', 'Status', 'Priority', 'Product', 'Qty', 'Price', 'Colour', 'Size', 'Material', 'Personalization', 'Details', 'Order Total', 'Advance', 'Balance', 'Notes'];
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = orders.flatMap(o => (o.items || []).map(i => [o.orderNo, o.customer, o.phone, o.orderDate, o.dueDate, o.status, o.priority, i.product, i.qty, i.price, i.color, i.size, i.material, i.personal, i.details, orderTotal(o), o.advance, orderBalance(o), o.notes]));
+  offerFile(`bastaa-orders-${todayISO()}.csv`, '﻿' + [cols, ...rows].map(r => r.map(q).join(',')).join('\r\n'));
+};
+$('#importFile').onchange = async e => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.app !== 'bastaa-orders' || !Array.isArray(data.orders)) throw new Error('This is not a Bastaa backup file.');
+    const how = await ask(`This backup has ${data.orders.length} orders. Add them to your current orders, or replace everything with the backup?`,
+      [{ label: 'Cancel', value: null }, { label: 'Replace all', value: 'replace', cls: 'danger' }, { label: 'Add / update', value: 'merge', cls: 'primary' }]);
+    if (!how) return;
+    if (how === 'replace') for (const o of orders.filter(x => !data.orders.some(y => y.id === x.id))) await store.del(o.id);
+    for (const o of data.orders) await store.put(o);
+    if (data.settings) { settings = { ...DEFAULT_SETTINGS, ...data.settings }; await store.saveSettings(settings); }
+    $('#settingsDialog').close(); toast(`Restored ${data.orders.length} orders`);
+  } catch (err) { toast('Restore failed: ' + (err.message || err.code)); }
+};
+
+/* ---------- wiring ---------- */
+$$('dialog').forEach(d => d.addEventListener('click', e => { if (e.target.closest('[data-close]')) d.close(); }));
+$('#newOrderBtn').onclick = () => openForm();
+$('#bellBtn').onclick = () => {
+  lsSet('bastaa.bannerHidden', ''); renderBanner();
+  if (!reminderList().length) toast('No orders are due soon.');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+$('#search').oninput = renderList;
+$('#statusFilter').onchange = () => { quickFilter = null; renderStats(); renderList(); };
+$('#sortBy').onchange = renderList;
+$('#orderList').onclick = e => { const c = e.target.closest('.order'); if (c) openView(c.dataset.id); };
+$('#orderList').onkeydown = e => { const c = e.target.closest('.order'); if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openView(c.dataset.id); } };
+$('#reminderBanner').onclick = e => {
+  if (e.target.id === 'hideBanner') { lsSet('bastaa.bannerHidden', todayISO() + ':' + reminderList().length); renderBanner(); return; }
+  const li = e.target.closest('li[data-id]'); if (li) openView(li.dataset.id);
+};
+$('#stats').onclick = e => {
+  const s = e.target.closest('.stat'); if (!s) return;
+  const f = s.dataset.f;
+  if (f === 'overdue' || f === 'soon') { quickFilter = quickFilter === f ? null : f; $('#statusFilter').value = 'open'; }
+  else { quickFilter = null; $('#statusFilter').value = f; }
+  renderStats(); renderList();
+};
+document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+setInterval(render, 30 * 60 * 1000);
+
+render();
+init().catch(err => { setSync('Could not start: ' + err.message); });
+</script>
