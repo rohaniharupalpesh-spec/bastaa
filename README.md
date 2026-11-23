@@ -16,6 +16,7 @@ Open `index.html` in a browser, or host the folder (e.g. GitHub Pages) and use *
 - **WhatsApp update**: one tap opens a ready-made message to the customer, based on the order status.
 - **Job sheet**: a printable page with all customization details and photos, for the workshop.
 - Search, filter and sort. Export to Excel (CSV).
+- **Google Sheet sync (free)**: orders copy to a Google Sheet automatically, with a WhatsApp link for each order. You can also log customers' WhatsApp messages in the sheet and reply from it. Setup: [`google-sheets/README.md`](google-sheets/README.md).
 
 ## Your data
 Orders are stored **only on the device/browser you use** (IndexedDB). Use **Settings → Download backup** regularly. To move orders to another device, use **Restore backup** there.
