@@ -99,6 +99,8 @@ fieldset { border: 1px solid var(--line); border-radius: var(--radius); margin: 
 legend { font-weight: 700; padding: 0 6px; color: var(--brand); }
 label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
 label input, label select, label textarea, fieldset > textarea { display: block; width: 100%; margin-top: 3px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 15px; }
+label.check { display: flex; align-items: center; gap: 8px; }
+label.check input { display: inline; width: auto; margin: 0; }
 fieldset > textarea { margin-bottom: 8px; }
 .readonly { background: var(--surface2) !important; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }

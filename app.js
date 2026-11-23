@@ -360,13 +360,13 @@ $('#orderForm').addEventListener('submit', async e => {
   const notified = lsGet('bastaa.notified', {}); delete notified[o.id]; lsSet('bastaa.notified', notified);
   $('#orderDialog').close();
   toast(editing ? 'Order updated' : `Order ${o.orderNo} saved`);
-  await load();
+  await load(); scheduleSync();
 });
 
 $('#deleteBtn').onclick = async () => {
   if (!editing || !confirm(`Delete order ${editing.orderNo} for ${editing.customer}? This cannot be undone.`)) return;
   await delOrder(editing.id);
-  $('#orderDialog').close(); toast('Order deleted'); load();
+  $('#orderDialog').close(); toast('Order deleted'); await load(); scheduleSync();
 };
 $('#addItemBtn').onclick = () => addItemRow();
 $('#orderForm').advance.addEventListener('input', updateTotals);
@@ -405,7 +405,7 @@ function openView(id) {
     if (b.dataset.status === o.status) return;
     const now = new Date().toISOString();
     const upd = { ...o, status: b.dataset.status, updatedAt: now, history: [...(o.history || []), { at: now, text: `Status → ${b.dataset.status}` }] };
-    await putOrder(upd); await load(); openView(o.id); toast(`Marked ${b.dataset.status}`);
+    await putOrder(upd); await load(); scheduleSync(); openView(o.id); toast(`Marked ${b.dataset.status}`);
   });
   $$('#viewBody .view-item img').forEach(img => img.onclick = () => openImage(img.src));
   $('#icsOne').onclick = () => downloadICS([o], `${o.orderNo}.ics`);
@@ -431,11 +431,75 @@ function printJobSheet(o) {
   w.document.close();
 }
 
+/* ---------- Google Sheet sync ---------- */
+// Sends every order (without photos) to the Apps Script web app in google-sheets/Code.gs,
+// which rewrites the "Orders" tab. Settings live in localStorage, separate from backups.
+let sheet = { url: '', secret: '', auto: true, lastSync: '', lastError: '', pending: false, ...lsGet('bastaa.sheet', {}) };
+const saveSheet = () => lsSet('bastaa.sheet', sheet);
+const sheetReady = () => /^https:\/\/script\.google(usercontent)?\.com\//.test(sheet.url) && !!sheet.secret;
+
+function sheetOrder(o) {
+  return {
+    id: o.id, orderNo: o.orderNo, customer: o.customer, phone: o.phone, address: o.address,
+    orderDate: o.orderDate, dueDate: o.dueDate, status: o.status, priority: o.priority, notes: o.notes,
+    products: o.items.map(i => [`${i.product} ×${i.qty}${i.price !== '' ? ' @ ' + money(i.price) : ''}`,
+      i.color, i.size, i.material, i.personal && `“${i.personal}”`, i.details, i.photos?.length && `${i.photos.length} photo(s)`]
+      .filter(Boolean).join(' · ')).join('\n'),
+    total: orderTotal(o), advance: Number(o.advance) || 0, balance: orderBalance(o),
+    updatedAt: o.updatedAt || o.createdAt, waLink: waLink(o, waMessage(o)) || '',
+  };
+}
+
+let syncing = null;
+async function syncToSheet({ silent = false } = {}) {
+  if (!sheetReady()) { if (!silent) toast('Add the Google Sheet web app URL and secret key in Settings first.'); return false; }
+  if (syncing) return syncing;
+  syncing = (async () => {
+    try {
+      // text/plain avoids a CORS preflight, which Apps Script cannot answer
+      const r = await fetch(sheet.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'sync', secret: sheet.secret, orders: orders.map(sheetOrder) }) });
+      const res = await r.json().catch(() => { throw new Error('Unexpected reply. Check the web app URL and that access is set to "Anyone".'); });
+      if (!res.ok) throw new Error(res.error || 'Sync failed');
+      Object.assign(sheet, { lastSync: new Date().toISOString(), lastError: '', pending: false });
+      if (!silent) toast(`Synced ${res.count} order${res.count === 1 ? '' : 's'} to Google Sheet`);
+      return true;
+    } catch (err) {
+      Object.assign(sheet, { lastError: navigator.onLine === false ? 'Offline — will sync when back online.' : err.message, pending: true });
+      if (!silent) toast('Sheet sync failed: ' + sheet.lastError);
+      return false;
+    } finally { saveSheet(); updateSheetState(); syncing = null; }
+  })();
+  return syncing;
+}
+let syncT;
+function scheduleSync() {
+  if (!sheetReady() || !sheet.auto) return;
+  sheet.pending = true; saveSheet();
+  clearTimeout(syncT); syncT = setTimeout(() => syncToSheet({ silent: true }), 1500);
+}
+function updateSheetState() {
+  const el = $('#sheetState'); if (!el) return;
+  el.textContent = !sheetReady() ? 'Not connected.' :
+    sheet.lastError ? `⚠️ Last sync failed: ${sheet.lastError}` :
+    sheet.lastSync ? `✅ Last synced ${new Date(sheet.lastSync).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}.` : 'Connected — not synced yet.';
+}
+$('#sheetSyncBtn').onclick = async () => {
+  const f = $('#settingsForm');
+  Object.assign(sheet, { url: f.sheetUrl.value.trim(), secret: f.sheetSecret.value.trim(), auto: f.sheetAuto.checked });
+  saveSheet();
+  $('#sheetSyncBtn').disabled = true;
+  await syncToSheet();
+  $('#sheetSyncBtn').disabled = false;
+};
+window.addEventListener('online', () => { if (sheet.pending && sheet.auto) syncToSheet({ silent: true }); });
+
 /* ---------- settings / backup ---------- */
 function openSettings() {
   const f = $('#settingsForm');
   for (const k of Object.keys(DEFAULT_SETTINGS)) f[k].value = settings[k];
-  updateNotifState();
+  f.sheetUrl.value = sheet.url; f.sheetSecret.value = sheet.secret; f.sheetAuto.checked = sheet.auto;
+  updateNotifState(); updateSheetState();
   $('#settingsDialog').showModal();
 }
 $('#settingsForm').addEventListener('submit', e => {
@@ -443,7 +507,13 @@ $('#settingsForm').addEventListener('submit', e => {
   const f = e.target;
   settings = { defaultRemindDays: Math.max(0, Number(f.defaultRemindDays.value) || 0), businessName: f.businessName.value.trim() || 'Bastaa', prefix: f.prefix.value.trim() || 'BST' };
   lsSet('bastaa.settings', settings);
+  const sheetChanged = sheet.url !== f.sheetUrl.value.trim() || sheet.secret !== f.sheetSecret.value.trim();
+  Object.assign(sheet, { url: f.sheetUrl.value.trim(), secret: f.sheetSecret.value.trim(), auto: f.sheetAuto.checked });
+  if (sheetChanged) Object.assign(sheet, { lastSync: '', lastError: '' });
+  saveSheet();
   $('#settingsDialog').close(); toast('Settings saved'); render(); checkReminders();
+  if (sheetChanged && sheetReady()) syncToSheet();
+  else scheduleSync(); // business name changes the WhatsApp messages
 });
 $('#enableNotifBtn').onclick = async () => {
   if (!('Notification' in window)) return;
@@ -467,7 +537,7 @@ $('#importFile').onchange = async e => {
     if (replace) await clearAll();
     for (const o of data.orders) await putOrder(o);
     if (data.settings) { settings = { ...DEFAULT_SETTINGS, ...data.settings }; lsSet('bastaa.settings', settings); }
-    $('#settingsDialog').close(); toast(`Restored ${data.orders.length} orders`); load();
+    $('#settingsDialog').close(); toast(`Restored ${data.orders.length} orders`); await load(); scheduleSync();
   } catch (err) { toast('Restore failed: ' + err.message); }
 };
 $('#csvBtn').onclick = () => {
@@ -508,4 +578,4 @@ setInterval(() => { render(); checkReminders(); }, 30 * 60 * 1000);
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 
-load().catch(err => { $('#orderList').innerHTML = `<div class="empty">Could not open storage: ${esc(err.message)}</div>`; });
+load().then(() => { if (sheet.pending && sheet.auto) syncToSheet({ silent: true }); }).catch(err => { $('#orderList').innerHTML = `<div class="empty">Could not open storage: ${esc(err.message)}</div>`; });

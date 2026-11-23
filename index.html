@@ -164,6 +164,17 @@
         <label>Order number prefix<input name="prefix" maxlength="8"></label>
       </fieldset>
       <fieldset>
+        <legend>Google Sheet &amp; WhatsApp</legend>
+        <p class="hint">Copy your orders to a free Google Sheet, with a WhatsApp link for each order. Setup steps: <code>google-sheets/README.md</code>.</p>
+        <label>Web app URL<input name="sheetUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
+        <label>Secret key<input name="sheetSecret" autocomplete="off"></label>
+        <label class="check"><input name="sheetAuto" type="checkbox"> Sync automatically when orders change</label>
+        <div class="row-btns">
+          <button type="button" id="sheetSyncBtn" class="ghost">🔄 Sync to Google Sheet now</button>
+        </div>
+        <p class="hint" id="sheetState"></p>
+      </fieldset>
+      <fieldset>
         <legend>Backup</legend>
         <p class="hint">Orders are saved only on this device/browser. Download a backup regularly, and use it to move orders to another phone or computer.</p>
         <div class="row-btns">
